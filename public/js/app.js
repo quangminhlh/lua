@@ -5,6 +5,8 @@ const downloadBtn = document.getElementById('download');
 
 async function obfuscate(){
   let res;
+  const btn = document.getElementById('obfuscate');
+  btn.disabled = true;
   if(fileEl.files[0]){
     const data = new FormData();
     data.append('luaFile', fileEl.files[0]);
@@ -27,6 +29,7 @@ async function obfuscate(){
   downloadBtn.href = URL.createObjectURL(blob);
   downloadBtn.download = 'obf.lua';
   downloadBtn.style.display = 'inline-block';
+  btn.disabled = false;
 }
 
 document.getElementById('obfuscate').addEventListener('click', obfuscate);

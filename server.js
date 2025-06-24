@@ -12,17 +12,20 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 function runObf(input, output, res){
-  execFile('lua', ['obfuscator.lua', input, output], (err) => {
-    if(err) {
+  execFile('lua', ['obfuscator.lua', input, output],
+    { windowsHide: true }, (err) => {
+    if(err){
       console.error(err);
-      return res.status(500).send('Obfuscation failed');
+      fs.unlink(input, () => {});
+      fs.unlink(output, () => {});
+      return res.status(500).type('text/plain').send('Obfuscation failed');
     }
     fs.readFile(output, 'utf8', (err, data) => {
       fs.unlink(input, () => {});
       fs.unlink(output, () => {});
       if(err){
         console.error(err);
-        return res.status(500).send('Read failed');
+        return res.status(500).type('text/plain').send('Read failed');
       }
       res.type('text/plain').send(data);
     });
@@ -32,8 +35,8 @@ function runObf(input, output, res){
 app.post('/api/obf-text', (req, res) => {
   const code = req.body.code;
   if(!code) return res.status(400).send('No code');
-  const inPath = path.join(os.tmpdir(), 'in.lua');
-  const outPath = path.join(os.tmpdir(), 'out.lua');
+  const inPath = path.join(os.tmpdir(), `in_${Date.now()}.lua`);
+  const outPath = path.join(os.tmpdir(), `out_${Date.now()}.lua`);
   fs.writeFile(inPath, code, (err) => {
     if(err){
       console.error(err);

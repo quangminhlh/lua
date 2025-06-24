@@ -1,12 +1,45 @@
 local inFile, outFile = ...
 if not inFile or not outFile then
-  io.stderr:write('Usage: lua obfuscator.lua in.lua out.lua\n')
+  io.stderr:write('Usage: lua obfuscator.lua <in> <out>\n')
   os.exit(1)
 end
 
-local f = assert(loadfile(inFile))
-local dumped = string.dump(f)
+-- compile input file
+local chunk = assert(loadfile(inFile))
+local dumped = string.dump(chunk)
 
+-- generate random key for XOR
+math.randomseed(os.time())
+local key = {}
+for i = 1, 32 do
+  key[i] = string.char(math.random(33,126))
+end
+key = table.concat(key)
+
+-- simple XOR helper using bitwise ops
+local function bxor(a, b)
+  local res = 0
+  for i = 0,7 do
+    local x = a % 2 + b % 2
+    if x == 1 then res = res + 2^i end
+    a = (a - a % 2) / 2
+    b = (b - b % 2) / 2
+  end
+  return res
+end
+
+local function xor(data, k)
+  local out = {}
+  for i=1,#data do
+    local kb = k:byte(((i-1)%#k)+1)
+    out[i] = string.char(bxor(data:byte(i), kb))
+  end
+  return table.concat(out)
+end
+
+local protected = xor(dumped, key)
+
+-- base64 encode
 local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function enc(data)
   return ((data:gsub('.',function(x)
@@ -21,10 +54,12 @@ local function enc(data)
   end)..({ '', '==', '=' })[#data%3+1])
 end
 
-local encoded = enc(dumped)
+local encoded = enc(protected):reverse()
+
+-- write obfuscated lua script
 local out = assert(io.open(outFile,'w'))
-out:write("local b='",b,"'\n")
-out:write([[
+out:write(string.format([[local key=%q
+local b=%q
 local function dec(data)
  data=data:gsub('[^'..b..'=]','')
  return (data:gsub('.',function(x)
@@ -39,7 +74,24 @@ local function dec(data)
   return string.char(c)
  end))
 end
-local chunk=load(dec(']]..encoded..[['))
-chunk()
-]])
+local function bxor(a,b)
+ local r=0
+ for i=0,7 do
+  local x=a%2+b%2
+  if x==1 then r=r+2^i end
+  a=(a-a%2)/2 b=(b-b%2)/2
+ end
+ return r
+end
+local function xor(data,k)
+ local t={}
+ for i=1,#data do
+  local kb=k:byte(((i-1)%#k)+1)
+  t[i]=string.char(bxor(data:byte(i),kb))
+ end
+ return table.concat(t)
+end
+local chunk=assert(load(xor(dec(string.reverse(%q)),key)))
+chunk(...)
+]], key, b, encoded))
 out:close()
