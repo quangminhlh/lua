@@ -8,6 +8,10 @@ if ! command -v node >/dev/null; then
   apt-get install -y nodejs
 fi
 
+if ! command -v lua >/dev/null; then
+  apt-get install -y lua5.3
+fi
+
 if ! command -v pm2 >/dev/null; then
   npm install -g pm2
 fi
